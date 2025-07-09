@@ -1,8 +1,8 @@
 #include "f3_launcher.h"
-#include <QDir>
-#include <QFile>
-#include <qmath.h>
-#include <QTime>
+#include <QtCore/QDir>
+#include <QtCore/QFile>
+#include <QtMath>
+#include <QtCore/QTime>
 
 #define F3_READ_COMMAND "f3read"
 #define F3_WRITE_COMMAND "f3write"
@@ -369,7 +369,7 @@ void f3_launcher::startFix()
     }
     else
     {
-        size = report.ActualFree.size();
+        size = report.ActualFree;
         blockSize = report.BlockSize;
     }
 

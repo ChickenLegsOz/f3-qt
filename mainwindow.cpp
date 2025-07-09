@@ -1,11 +1,12 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "helpwindow.h"
-#include <QDesktopWidget>
-#include <QMessageBox>
-#include <QFileDialog>
-#include <QCloseEvent>
-#include <QDir>
+#include <QtGui/QScreen>
+#include <QGuiApplication>
+#include <QtWidgets/QMessageBox>
+#include <QtWidgets/QFileDialog>
+#include <QtGui/QCloseEvent>
+#include <QtCore/QDir>
 
 void f3_qt_fillReport(f3_launcher_report &report)
 {
@@ -46,8 +47,13 @@ MainWindow::MainWindow(QWidget *parent) :
             SLOT(on_timerTimeout()));
     checking = false;
     this->userMode = 0;
-    move((QApplication::desktop()->width() - width()) / 2,
-         (QApplication::desktop()->width() - width()) / 2);
+    // Center window on screen
+    QScreen *screen = QGuiApplication::primaryScreen();
+    if (screen) {
+        QRect screenGeometry = screen->availableGeometry();
+        move((screenGeometry.width() - width()) / 2 + screenGeometry.left(),
+             (screenGeometry.height() - height()) / 2 + screenGeometry.top());
+    }
     setFixedSize(width(), height());
     clearStatus();
 }

@@ -1,5 +1,5 @@
 #include "mainwindow.h"
-#include <QApplication>
+#include <QtWidgets/QApplication>
 
 int main(int argc, char *argv[])
 {
@@ -8,9 +8,6 @@ int main(int argc, char *argv[])
         qgetenv("QT_SCREEN_SCALE_FACTORS").isEmpty())
     {
         qputenv("QT_AUTO_SCREEN_SCALE_FACTOR", "1");
-#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
-        QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-#endif
     }
 
     QApplication a(argc, argv);

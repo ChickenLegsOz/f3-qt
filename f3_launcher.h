@@ -1,8 +1,8 @@
 #ifndef F3_LAUNCHER_H
 #define F3_LAUNCHER_H
-#include <QProcess>
-#include <QTimer>
-#include <QMap>
+#include <QtCore/QProcess>
+#include <QtCore/QTimer>
+#include <QtCore/QMap>
 
 
 enum f3_launcher_status

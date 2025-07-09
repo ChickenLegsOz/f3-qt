@@ -1,4 +1,4 @@
-#include <QPushButton>
+#include <QtWidgets/QPushButton>
 #include "helpwindow.h"
 #include "ui_helpwindow.h"
 
