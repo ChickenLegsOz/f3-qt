@@ -3,3 +3,4 @@ f3-qt
 moc*
 ui*.h
 *.pro.user*
+build/
