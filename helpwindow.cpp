@@ -18,7 +18,8 @@ HelpWindow::HelpWindow(QWidget *parent) :
                     "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or "
                     "FITNESS FOR A PARTICULAR PURPOSE. See the GNU Library General Public License "
                     "for more details.\n");
-    ui->labelContact->setText("<p>GUI Author: Tianze Wang &lt;<a href=\"mailto:zwpwjwtz@126.com\">zwpwjwtz@126.com</a>&gt;</p>"
+    ui->labelContact->setText("<p>Qt6 GUI Author: Ryan McFadden &lt;<a href=\"mailto:Ryan.McFadden@outlook.com.au\">Ryan.McFadden@outlook.com.au</a>&gt;</p>"
+                    "<p>GUI Author: Tianze Wang &lt;<a href=\"mailto:zwpwjwtz@126.com\">zwpwjwtz@126.com</a>&gt;</p>"
                     "<p>Author of F3: Michel Machado &lt;<a href=\"mailto:michel@digirati.com.br\">michel@digirati.com.br</a>&gt;</p>"
                     "<p>Project Home: <a href=\"https://github.com/zwpwjwtz/f3-qt\">Github</a>"
                     "<p align=\"center\">Feel free to report bugs and give suggestions!</p>");
