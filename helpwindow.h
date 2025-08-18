@@ -1,7 +1,7 @@
 #ifndef HELPWINDOW_H
 #define HELPWINDOW_H
 
-#include <QtWidgets/QDialog>
+#include <QDialog>
 
 namespace Ui {
 class HelpWindow;
