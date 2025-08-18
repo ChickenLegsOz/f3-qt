@@ -1,12 +1,15 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "helpwindow.h"
-#include <QtGui/QScreen>
+#include <QScreen>
+#include <QLabel>
 #include <QGuiApplication>
-#include <QtWidgets/QMessageBox>
-#include <QtWidgets/QFileDialog>
-#include <QtGui/QCloseEvent>
-#include <QtCore/QDir>
+#include <QMessageBox>
+#include <QFileDialog>
+#include <QCloseEvent>
+#include <QDir>
+#include <QStatusBar>
+#include <QCryptographicHash>
 
 void f3_qt_fillReport(f3_launcher_report &report)
 {

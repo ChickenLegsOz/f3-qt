@@ -1,4 +1,4 @@
-#include <QtWidgets/QPushButton>
+#include <QPushButton>
 #include "helpwindow.h"
 #include "ui_helpwindow.h"
 
@@ -8,7 +8,7 @@ HelpWindow::HelpWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     setFixedSize(width(), height());
-    ui->labelVersion->setText(QString("Ver: ").append(APP_VERSION));
+    ui->labelVersion->setText(QString("Ver: ") + APP_VERSION);
     ui->textAbout->setText("This program is a free software.\n\n"
                     "You can redistribute it and/or modify it under the terms of "
                     "the GNU Library General Public License as published by "

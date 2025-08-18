@@ -1,8 +1,9 @@
 #include "f3_launcher.h"
-#include <QtCore/QDir>
-#include <QtCore/QFile>
+#include <QDir>
+#include <QFile>
 #include <QtMath>
-#include <QtCore/QTime>
+#include <QTime>
+#include <QMessageBox>
 
 #define F3_READ_COMMAND "f3read"
 #define F3_WRITE_COMMAND "f3write"
@@ -177,14 +178,8 @@ f3_launcher::f3_launcher()
     options["autofix"] = "no";
 
     stage = 0;
-    connect(&f3_cui,
-            SIGNAL(finished(int,QProcess::ExitStatus)),
-            this,
-            SLOT(on_f3_cui_finished()));
-    connect(&timer,
-            SIGNAL(timeout()),
-            this,
-            SLOT(on_timer_timeout()));
+    connect(&f3_cui, &QProcess::finished, this, &f3_launcher::on_f3_cui_finished);
+    connect(&timer, &QTimer::timeout, this, &f3_launcher::on_timer_timeout);
     timer.setInterval(200);
 
 }
@@ -491,6 +486,9 @@ int f3_launcher::parseOutput()
             break;
         case 20:    //Not directory
             emitError(f3_launcher_not_directory);
+            break;
+        case 21:    //Tried to open a directory instead of a device
+            emitError(f3_launcher_not_device);
         case 64:    //No argument
             break;
         case 143:   //Terminated by other process

@@ -1,8 +1,10 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QtWidgets/QMainWindow>
-#include <QtCore/QTimer>
+#include <QMainWindow>
+#include <QTimer>
+#include <QLabel>
+#include <QProgressBar>
 #include "f3_launcher.h"
 #include "helpwindow.h"
 
