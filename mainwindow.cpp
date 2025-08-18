@@ -151,38 +151,120 @@ void MainWindow::showResultPage(bool visible)
 
 QString MainWindow::mountDisk(const QString& device)
 {
-    QDir dir;
-    QString mountDir = device;
-    mountDir.replace('/','_').replace('\\','_').append("_f3-qt");
-    dir.mkdir(mountDir);
-    QProcess cui;
-    QStringList args(device);
-    args << mountDir;
-    cui.start("mount", args);
-    cui.waitForStarted();
-    cui.waitForFinished();
-    if (cui.exitCode() == 0)
-        return mountDir;
-    else
-    {
-        dir.rmdir(mountDir);
-        return "";
+    // Sanitize and validate the device path
+    QString sanitizedDevice = device.trimmed();
+    QFileInfo deviceInfo(sanitizedDevice);
+    
+    if (sanitizedDevice.isEmpty() || !deviceInfo.exists()) {
+        QMessageBox::critical(this, "Mount Error", "Invalid device path specified.");
+        return QString();
     }
+    
+    // Create a safe mount directory name
+    QDir dir;
+    QString mountDir = QString("%1/f3qt_mount_%2").arg(
+        QDir::tempPath(),
+        QString(QCryptographicHash::hash(device.toUtf8(), QCryptographicHash::Sha256).toHex()).left(8)
+    );
+    
+    // Ensure the directory doesn't exist and create it
+    if (dir.exists(mountDir)) {
+        if (!dir.rmdir(mountDir)) {
+            QMessageBox::critical(this, "Mount Error", "Unable to clean up existing mount point.");
+            return QString();
+        }
+    }
+    
+    if (!dir.mkdir(mountDir)) {
+        QMessageBox::critical(this, "Mount Error", "Unable to create mount directory.");
+        return QString();
+    }
+    
+    // Setup and execute mount command
+    QProcess cui;
+    QStringList args;
+    args << sanitizedDevice << mountDir;
+    
+    cui.start("mount", args);
+    if (!cui.waitForStarted(5000)) {  // 5 second timeout
+        dir.rmdir(mountDir);
+        QMessageBox::critical(this, "Mount Error", "Failed to start mount command.");
+        return QString();
+    }
+    
+    if (!cui.waitForFinished(30000)) {  // 30 second timeout
+        cui.terminate();
+        cui.waitForFinished(5000);
+        dir.rmdir(mountDir);
+        QMessageBox::critical(this, "Mount Error", "Mount operation timed out.");
+        return QString();
+    }
+    
+    if (cui.exitCode() != 0) {
+        QString errorOutput = QString::fromUtf8(cui.readAllStandardError());
+        dir.rmdir(mountDir);
+        QMessageBox::critical(this, "Mount Error", 
+            QString("Failed to mount device.\nError: %1").arg(errorOutput.isEmpty() ? "Unknown error" : errorOutput));
+        return QString();
+    }
+    
+    // Verify the mount was successful
+    QDir mountedDir(mountDir);
+    if (!mountedDir.exists()) {
+        QMessageBox::critical(this, "Mount Error", "Mount point doesn't exist after mount operation.");
+        return QString();
+    }
+    
+    return mountDir;
 }
 
 bool MainWindow::unmountDisk(const QString& mountPoint)
 {
-    QProcess cui;
-    QStringList args(mountPoint);
-    cui.start("umount", args);
-    cui.waitForStarted();
-    cui.waitForFinished();
-    QDir dir;
-    dir.rmdir(mountPoint);
-    if (cui.exitCode() == 0)
-        return true;
-    else
+    // Validate mount point
+    QString sanitizedMountPoint = mountPoint.trimmed();
+    if (sanitizedMountPoint.isEmpty()) {
+        QMessageBox::critical(this, "Unmount Error", "Invalid mount point specified.");
         return false;
+    }
+    
+    QDir mountDir(sanitizedMountPoint);
+    if (!mountDir.exists()) {
+        QMessageBox::warning(this, "Unmount Warning", "Mount point doesn't exist.");
+        return false;
+    }
+    
+    // Setup and execute unmount command
+    QProcess cui;
+    QStringList args;
+    args << sanitizedMountPoint;
+    
+    cui.start("umount", args);
+    if (!cui.waitForStarted(5000)) {  // 5 second timeout
+        QMessageBox::critical(this, "Unmount Error", "Failed to start unmount command.");
+        return false;
+    }
+    
+    if (!cui.waitForFinished(30000)) {  // 30 second timeout
+        cui.terminate();
+        cui.waitForFinished(5000);
+        QMessageBox::critical(this, "Unmount Error", "Unmount operation timed out.");
+        return false;
+    }
+    
+    if (cui.exitCode() != 0) {
+        QString errorOutput = QString::fromUtf8(cui.readAllStandardError());
+        QMessageBox::critical(this, "Unmount Error", 
+            QString("Failed to unmount device.\nError: %1").arg(errorOutput.isEmpty() ? "Unknown error" : errorOutput));
+        return false;
+    }
+    
+    // Clean up the mount point directory
+    if (!mountDir.rmdir(sanitizedMountPoint)) {
+        QMessageBox::warning(this, "Unmount Warning", 
+            "Device unmounted successfully but failed to remove mount point directory.");
+    }
+    
+    return true;
 }
 
 bool MainWindow::sureToExit(bool manualClose)
@@ -429,7 +511,7 @@ void MainWindow::on_buttonCheck_clicked()
     else
         inputPath = ui->textDev->text().trimmed();
     
-    if (inputPath.isEmpty())
+        if (inputPath.isEmpty())
     {
         QMessageBox::warning(this,"Warning","Please input the device path!");
         return;
