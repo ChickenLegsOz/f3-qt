@@ -4,6 +4,9 @@
 #include <QtMath>
 #include <QTime>
 #include <QMessageBox>
+#include <QDebug>
+#include <QMetaMethod>
+#include <QStringList>
 
 #define F3_READ_COMMAND "f3read"
 #define F3_WRITE_COMMAND "f3write"
@@ -189,7 +192,11 @@ f3_launcher::f3_launcher() :
     options["autofix"] = "no";
 
     stage = 0;
-    connect(f3_cui.data(), &QProcess::finished, this, &f3_launcher::on_f3_cui_finished);
+#if (QT_VERSION >= QT_VERSION_CHECK(5,6,0))
+    connect(f3_cui.data(), QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &f3_launcher::on_f3_cui_finished);
+#else
+    connect(f3_cui.data(), static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this, &f3_launcher::on_f3_cui_finished);
+#endif
     connect(timer.data(), &QTimer::timeout, this, &f3_launcher::on_timer_timeout);
     timer->setInterval(200);
 
@@ -398,7 +405,7 @@ void f3_launcher::startFix()
 
 bool f3_launcher::probeCommand(QString command)
 {
-    f3_cui->start(command.prepend(f3_path));
+    f3_cui->start(command.prepend(f3_path), QStringList());
     f3_cui->waitForStarted();
     f3_cui->waitForFinished();
     if (f3_cui->exitCode() == 255 || 
@@ -532,7 +539,7 @@ int f3_launcher::parseOutput()
     return exitCode;
 }
 
-void f3_launcher::on_f3_cui_finished()
+void f3_launcher::on_f3_cui_finished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     timer->stop();
     if (stage == 0)

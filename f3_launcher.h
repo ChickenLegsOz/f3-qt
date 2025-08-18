@@ -96,7 +96,7 @@ private:
     int parseOutput();
 
 private slots:
-    void on_f3_cui_finished();
+    void on_f3_cui_finished(int exitCode, QProcess::ExitStatus exitStatus);
     void on_timer_timeout();
 };
 

@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "helpwindow.h"
+#include <QDebug>
 #include <QScreen>
 #include <QLabel>
 #include <QGuiApplication>
@@ -10,6 +11,7 @@
 #include <QDir>
 #include <QStatusBar>
 #include <QCryptographicHash>
+#include <QStyle>
 
 void f3_qt_fillReport(f3_launcher_report &report)
 {
@@ -67,6 +69,10 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(&cui, &f3_launcher::f3_launcher_error, this, &MainWindow::on_cuiError);
     connect(&timer, &QTimer::timeout, this, &MainWindow::on_timerTimeout);
     checking = false;
+
+    // Set help button icon
+    ui->buttonHelp->setIcon(QApplication::style()->standardIcon(QStyle::SP_DialogHelpButton));
+    
     // Center window on screen
     QScreen *screen = QGuiApplication::primaryScreen();
     if (screen) {

@@ -26,9 +26,11 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
     Widgets
 )
 
-qt_standard_project_setup()
+if (${QT_VERSION_MAJOR} EQUAL 6)
+    qt_standard_project_setup()
+endif()
 
-qt_add_executable(f3-qt WIN32 MACOSX_BUNDLE
+add_executable(f3-qt WIN32 MACOSX_BUNDLE
     f3_launcher.cpp f3_launcher.h
     helpwindow.cpp helpwindow.h helpwindow.ui
     main.cpp
@@ -42,19 +44,21 @@ target_compile_definitions(f3-qt PRIVATE
 
 # Icon resources
 set(ICON_RESOURCES
-    advanced.png
-    back.png
-    close.png
     f3.png
-    help.png
 )
 
-qt_add_resources(f3-qt "icons"
-    PREFIX
-        "/icons"
-    FILES
-        ${ICON_RESOURCES}
-)
+if (${QT_VERSION_MAJOR} EQUAL 6)
+    qt_add_resources(f3-qt "icons"
+        PREFIX
+            "/icons"
+        FILES
+            ${ICON_RESOURCES}
+    )
+else()
+    # Qt5 way of adding resources
+    qt5_add_resources(ICON_RC "icon.qrc")
+    target_sources(f3-qt PRIVATE ${ICON_RC})
+endif()
 
 # Copy desktop file
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/f3-qt.desktop
@@ -82,15 +86,25 @@ if(UNIX AND NOT APPLE)
     )
     
     # Install icons
+    foreach(size IN ITEMS 16 22 24 32 48 64 128 256)
+        install(FILES f3.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
+            RENAME f3-qt.png
+        )
+    endforeach()
+    
+    # Install icon to pixmaps for legacy compatibility
     install(FILES f3.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps
         RENAME f3-qt.png
     )
 endif()
 
-qt_generate_deploy_app_script(
-    TARGET f3-qt
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
-)
-install(SCRIPT ${deploy_script})
+if (${QT_VERSION_MAJOR} EQUAL 6)
+    qt_generate_deploy_app_script(
+        TARGET f3-qt
+        OUTPUT_SCRIPT deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+    install(SCRIPT ${deploy_script})
+endif()

@@ -80,8 +80,7 @@
           <string/>
          </property>
          <property name="icon">
-          <iconset resource="icon.qrc">
-           <normaloff>:/icon/help.png</normaloff>:/icon/help.png</iconset>
+          <iconset theme="QIcon::ThemeIcon::HelpAbout"/>
          </property>
          <property name="iconSize">
           <size>
@@ -271,7 +270,7 @@
              <string/>
             </property>
             <property name="icon">
-             <iconset resource="icon.qrc">
+             <iconset>
               <normaloff>:/icon/close.png</normaloff>:/icon/close.png</iconset>
             </property>
             <property name="iconSize">
