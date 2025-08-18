@@ -44,16 +44,26 @@
 #define F3_FILE_FILTER "*.h2w"
 
 
-QString f3_get_line_result(const QString& str,const QString& testString)
+QString f3_get_line_result(const QString& str, const QString& testString)
 {
-    int p1 = str.indexOf(testString);
-    if (p1 >= 0)
-    {
-        int p2 = str.indexOf('\n',p1 + 1);
-        return str.mid(p1 + testString.length(), p2 - p1 - testString.length()).trimmed();
+    if (str.isEmpty() || testString.isEmpty()) {
+        return QString();
     }
-    else
-        return "";
+
+    int startPos = str.indexOf(testString);
+    if (startPos < 0) {
+        return QString();
+    }
+
+    startPos += testString.length();
+    int endPos = str.indexOf('\n', startPos);
+    
+    // Handle case where there's no newline (last line)
+    if (endPos < 0) {
+        endPos = str.length();
+    }
+
+    return str.mid(startPos, endPos - startPos).trimmed();
 }
 
 int f3_capacity_grade(const QString& capacity)
@@ -417,23 +427,44 @@ float f3_launcher::probeVersion()
 
 bool f3_launcher::probeDiskFull(QString& devPath)
 {
-    bool diskFull = false;
-    QFile tempFile(QString(devPath).
-                   append("/").
-                   append(F3_DISK_PROBE_FILE));
-    if (!tempFile.open(QFile::ReadWrite))
-        diskFull = true;
-    else
-    {
-        QByteArray data ("TestData");
-        if (tempFile.write(data) < data.length())
-            diskFull = true;
-        else if (tempFile.read(data.length()) != data)
-            diskFull = true;
+    const QByteArray testData("TestData");
+    QFile tempFile(QDir(devPath).filePath(F3_DISK_PROBE_FILE));
+
+    // Try to open the file
+    if (!tempFile.open(QFile::ReadWrite)) {
+        qWarning() << "Cannot open test file:" << tempFile.errorString();
+        return true;  // Consider disk full if we can't write
     }
+
+    // Try to write test data
+    if (tempFile.write(testData) != testData.length()) {
+        qWarning() << "Failed to write test data:" << tempFile.errorString();
+        tempFile.close();
+        tempFile.remove();
+        return true;
+    }
+
+    // Seek back to start for reading
+    if (!tempFile.seek(0)) {
+        qWarning() << "Failed to seek in test file:" << tempFile.errorString();
+        tempFile.close();
+        tempFile.remove();
+        return true;
+    }
+
+    // Read and verify data
+    QByteArray readData = tempFile.read(testData.length());
+    if (readData != testData) {
+        qWarning() << "Data verification failed";
+        tempFile.close();
+        tempFile.remove();
+        return true;
+    }
+
+    // Cleanup
     tempFile.close();
     tempFile.remove();
-    return diskFull;
+    return false;  // Disk has space and is writable
 }
 
 bool f3_launcher::probeCacheFile(QString& devPath)
