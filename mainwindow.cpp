@@ -497,6 +497,60 @@ void MainWindow::on_cuiError(f3_launcher_error_code errCode)
     }
 }
 
+bool MainWindow::validatePath(const QString& path, bool isDevice) {
+    if (path.isEmpty()) {
+        QMessageBox::warning(this, "Validation Error", "Path cannot be empty!");
+        return false;
+    }
+
+    QFileInfo fileInfo(path);
+    if (!fileInfo.exists()) {
+        QMessageBox::warning(this, "Validation Error", 
+            QString("The specified %1 does not exist!").arg(isDevice ? "device" : "path"));
+        return false;
+    }
+
+    if (isDevice) {
+        // For device validation, check if it's in /dev
+        if (!path.startsWith("/dev/")) {
+            QMessageBox::warning(this, "Validation Error", 
+                "Device path must be in /dev/ directory!");
+            return false;
+        }
+        
+        // Check if it's a device file in /dev
+        QDir devDir("/dev");
+        if (!devDir.exists(path)) {
+            QMessageBox::warning(this, "Validation Error", 
+                "The specified device path does not exist in /dev!");
+            return false;
+        }
+        
+        // Check if it's a block device by checking if it's a special file
+        QFile device(path);
+        if (!device.open(QIODevice::ReadOnly)) {
+            QMessageBox::warning(this, "Validation Error", 
+                "Cannot access the device. Check permissions.");
+            return false;
+        }
+        device.close();
+    } else {
+        // Directory-specific validation
+        if (!fileInfo.isDir()) {
+            QMessageBox::warning(this, "Validation Error", 
+                "The specified path is not a directory!");
+            return false;
+        }
+        if (!fileInfo.isWritable()) {
+            QMessageBox::warning(this, "Validation Error", 
+                "The specified directory is not writable!");
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void MainWindow::on_buttonCheck_clicked()
 {
     if (checking)
@@ -506,14 +560,14 @@ void MainWindow::on_buttonCheck_clicked()
     }
 
     QString inputPath;
-    if (ui->tabWidget->currentIndex() == 0)
-        inputPath  = ui->textDevPath->text().trimmed();
+    bool isDeviceMode = ui->tabWidget->currentIndex() == 1;
+    
+    if (!isDeviceMode)
+        inputPath = ui->textDevPath->text().trimmed();
     else
         inputPath = ui->textDev->text().trimmed();
     
-        if (inputPath.isEmpty())
-    {
-        QMessageBox::warning(this,"Warning","Please input the device path!");
+    if (!validatePath(inputPath, isDeviceMode)) {
         return;
     }
 
@@ -595,10 +649,15 @@ void MainWindow::on_buttonExit_clicked()
 
 void MainWindow::on_buttonSelectPath_clicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this,"Choose Device Path");
-    if (!path.isEmpty())
+    QString path = QFileDialog::getExistingDirectory(this, "Choose Device Path", 
+        QString(), QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    
+    if (path.isEmpty())
+        return;
+        
+    if (validatePath(path, false)) {
         ui->textDevPath->setText(path);
-
+    }
 }
 
 void MainWindow::on_timerTimeout()
@@ -623,9 +682,15 @@ void MainWindow::on_buttonHelp_clicked()
 
 void MainWindow::on_buttonSelectDev_clicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this,"Choose Device Path", "/dev");
-    if (!path.isEmpty())
-        ui->textDevPath->setText(path);
+    QString path = QFileDialog::getExistingDirectory(this, "Choose Device Path", "/dev",
+        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    
+    if (path.isEmpty())
+        return;
+        
+    if (validatePath(path, true)) {
+        ui->textDev->setText(path);
+    }
 }
 
 void MainWindow::on_optionQuickTest_clicked()
