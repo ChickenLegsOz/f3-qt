@@ -101,40 +101,68 @@ void MainWindow::clearStatus()
 void MainWindow::showProgress(int progress10K)
 {
     progressBar->setVisible(true);
+    
+    // Handle special cases
     if (progress10K == -1) {
-        //Show an indeterminate state
+        // Show an indeterminate state
         progressBar->setMinimum(0);
         progressBar->setMaximum(0);
+        showStatus("Processing...");
         return;
     } else if (progress10K < -1) {
+        // Error or reset state
         progressBar->setMaximum(0);
         progressBar->setValue(0);
         showStatus("");
         return;
     }
 
-    if (progressBar->maximum() <= 0)
-        progressBar->setMaximum(10000);
+    // Validate progress value
+    progress10K = qBound(0, progress10K, 10000);
     
+    // Ensure proper range is set
+    if (progressBar->maximum() <= 0) {
+        progressBar->setMinimum(0);
+        progressBar->setMaximum(10000);
+    }
+    
+    // Update progress
     progressBar->setValue(progress10K);
-    showStatus(QString("Processing: %1%").arg(progress10K / 100.0f));
+    
+    // Format percentage with 2 decimal places
+    double percentage = progress10K / 100.0;
+    showStatus(QString("Processing: %1%").arg(percentage, 0, 'f', 2));
+    
+    // Ensure visual update
     progressBar->repaint();
 }
 
 void MainWindow::showCapacity(int value)
 {
+    // Validate the input value
+    if (value > 100) {
+        qWarning() << "Invalid capacity value:" << value << "(should be 0-100)";
+        value = 100;
+    }
+    
     if (value >= 0)
     {
         ui->capacityBar->setFormat("%p% Available");
         timerTarget = value;
     }
     else
+    {
         ui->capacityBar->setFormat("Capacity not available");
+        timerTarget = 0;
+    }
 
     ui->capacityBar->setValue(0);
     if (value <= 0)
         return;
-    timer.setInterval(1000 / value);
+        
+    // Prevent division by zero and ensure reasonable update rate
+    int interval = qBound(10, 1000 / value, 1000);  // Between 10ms and 1000ms
+    timer.setInterval(interval);
     timer.start();
 }
 
