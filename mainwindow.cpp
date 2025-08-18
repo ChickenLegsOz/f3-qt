@@ -355,10 +355,17 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
         case f3_launcher_finished:
         {
             f3_launcher_report report = cui.getReport();
+            
+            // First handle the progress bar and make it invisible
+            progressBar->setValue(0);
+            progressBar->setVisible(false);
+            
+            // Then set the final status
             if (report.success)
                 showStatus("Finished (without error).");
             else
                 showStatus("Finished.");
+                
             if (report.ReportedFree == "(Fixed)")
             {
                 QMessageBox::information(this,"Fixed successfully",
@@ -377,7 +384,6 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
                                     .append("\nWrite speed: ")
                                     .append(report.WritingSpeed)
                                     );
-            showProgress(0);
             showCapacity(report.availability * 100);
             showResultPage(true);
             break;
