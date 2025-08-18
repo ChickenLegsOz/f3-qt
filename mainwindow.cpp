@@ -35,21 +35,38 @@ MainWindow::MainWindow(QWidget *parent) :
         on_cuiError(cuiError);
 
     ui->setupUi(this);
-    ui->stackedWidget->setCurrentIndex(0);
-    connect(&cui,
-            SIGNAL(f3_launcher_status_changed(f3_launcher_status)),
-            this,
-            SLOT(on_cuiStatusChanged(f3_launcher_status)));
-    connect(&cui,
-            SIGNAL(f3_launcher_error(f3_launcher_error_code)),
-            this,
-            SLOT(on_cuiError(f3_launcher_error_code)));
-    connect(&timer,
-            SIGNAL(timeout()),
-            this,
-            SLOT(on_timerTimeout()));
+    QStatusBar *statusBar = new QStatusBar(this);
+    setStatusBar(statusBar);
+
+    // Create and configure the label
+    currentStatus = new QLabel(this);
+    currentStatus->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+    currentStatus->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    currentStatus->setMinimumWidth(200);
+
+    // Create and configure the progress bar
+    progressBar = new QProgressBar(this);
+    progressBar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
+    progressBar->setVisible(false);
+    progressBar->setTextVisible(true);
+
+    // Create container widget and layout
+    QWidget *statusWidget = new QWidget(this);
+    statusWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    QHBoxLayout *statusLayout = new QHBoxLayout(statusWidget);
+    statusLayout->setContentsMargins(0, 0, 0, 0);
+
+    // Add widgets to layout
+    statusLayout->addWidget(currentStatus);
+    statusLayout->addStretch(1);  // Use addStretch instead of QSpacerItem
+    statusLayout->addWidget(progressBar);
+
+    // Add to status bar
+    statusBar->addWidget(statusWidget, 1);  // Use addWidget with stretch
+    connect(&cui, &f3_launcher::f3_launcher_status_changed, this, &MainWindow::on_cuiStatusChanged);
+    connect(&cui, &f3_launcher::f3_launcher_error, this, &MainWindow::on_cuiError);
+    connect(&timer, &QTimer::timeout, this, &MainWindow::on_timerTimeout);
     checking = false;
-    this->userMode = 0;
     // Center window on screen
     QScreen *screen = QGuiApplication::primaryScreen();
     if (screen) {
@@ -68,35 +85,40 @@ MainWindow::~MainWindow()
 
 void MainWindow::showStatus(const QString &string)
 {
-    ui->statusBar->showMessage(string);
+    currentStatus->setText(string);
 }
 
 void MainWindow::clearStatus()
 {
-    ui->statusBar->showMessage("Ready");
+    currentStatus->setText("Ready");
     ui->labelSpace->clear();
     ui->labelSpeed->clear();
-    ui->labelProgress->setText("Progress:");
-    showProgress(0);
-    showProgressPage(false);
+    progressBar->setValue(0);
+    //progressBar->setVisible(false);
+    showResultPage(false);
 }
 
 void MainWindow::showProgress(int progress10K)
 {
-    if (progress10K < 0)
-    {
-        ui->progressBar->setMaximum(0);
-        ui->progressBar->setValue(0);
-        ui->labelProgressValue->setText("");
+    progressBar->setVisible(true);
+    if (progress10K == -1) {
+        //Show an indeterminate state
+        progressBar->setMinimum(0);
+        progressBar->setMaximum(0);
+        return;
+    } else if (progress10K < -1) {
+        progressBar->setMaximum(0);
+        progressBar->setValue(0);
+        showStatus("");
         return;
     }
 
-    if (ui->progressBar->maximum() <= 0)
-        ui->progressBar->setMaximum(10000);
-    ui->progressBar->setValue(progress10K);
-    ui->labelProgressValue->setText(QString("%1%").
-                                    arg(progress10K / 100.0f));
-    ui->progressBar->repaint();
+    if (progressBar->maximum() <= 0)
+        progressBar->setMaximum(10000);
+    
+    progressBar->setValue(progress10K);
+    showStatus(QString("Processing: %1%").arg(progress10K / 100.0f));
+    progressBar->repaint();
 }
 
 void MainWindow::showCapacity(int value)
@@ -116,20 +138,15 @@ void MainWindow::showCapacity(int value)
     timer.start();
 }
 
-void MainWindow::showProgressPage(bool visible)
-{
-    if (visible)
-        ui->stackedWidget->setCurrentIndex(2);
-    else if (ui->stackedWidget->currentIndex() == 2)
-        ui->stackedWidget->setCurrentIndex(userMode == 1 ? 1 : 0);
-}
-
 void MainWindow::showResultPage(bool visible)
 {
-    if (visible)
-        ui->stackedWidget->setCurrentIndex(3);
-    else
-        ui->stackedWidget->setCurrentIndex(userMode == 1 ? 1 : 0);
+    if (visible) {
+        ui->tabWidget->setTabVisible(2, true);
+        ui->tabWidget->setCurrentIndex(2);
+    } else {
+        ui->tabWidget->setTabVisible(2, false);
+        ui->tabWidget->setCurrentIndex(0);
+    }
 }
 
 QString MainWindow::mountDisk(const QString& device)
@@ -177,7 +194,7 @@ bool MainWindow::sureToExit(bool manualClose)
                               QMessageBox::Yes | QMessageBox::No,
                               QMessageBox::No) != QMessageBox::Yes)
             return false;
-    if (userMode == 1 && ui->optionQuickTest->isChecked()
+    if (ui->tabWidget->currentIndex() == 1 && ui->optionQuickTest->isChecked()
                       && ui->optionDestructive->isChecked() == false)
     {
         if (QMessageBox::warning(this,"Quit F3",
@@ -219,12 +236,11 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
             break;
         case f3_launcher_running:
             showStatus("Checking... Please wait...");
-            ui->buttonMode->setEnabled(false);
             ui->textDev->setReadOnly(true);
             ui->textDevPath->setReadOnly(true);
             ui->buttonSelectDev->setEnabled(false);
             ui->buttonSelectPath->setEnabled(false);
-            showProgressPage(true);
+            progressBar->setVisible(true);
             break;
         case f3_launcher_finished:
         {
@@ -259,26 +275,26 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
         case f3_launcher_stopped:
             showStatus("Stopped.");
             showProgress(0);
-            ui->labelProgressSpin->setText("!");
+            progressBar->setFormat("!");
             break;
         case f3_launcher_staged:
         {
-            QString progressText = QString("Progress:(Stage %1)").arg(cui.getStage());
-            ui->labelProgress->setText(progressText);
+            QString progressText = QString("Progress: (Stage %1)").arg(cui.getStage());
+            showStatus(progressText);
             showProgress(-1);
-            ui->labelProgressSpin->setText("?");
+            progressBar->setFormat("?");
             break;
         }
         case f3_launcher_progressed:
             showProgress(cui.progress10K);
-            switch(ui->labelProgressSpin->text()[0].toLatin1()){
+            switch(progressBar->format()[0].toLatin1()){
                 case '|': qsSpinNext = "/"; break;
                 case '/': qsSpinNext = "---"; break;
                 case '-': qsSpinNext = "\\"; break;
                 case '\\': qsSpinNext = "|"; break;
                 default: qsSpinNext = "|"; break;
             }
-            ui->labelProgressSpin->setText(qsSpinNext);
+            progressBar->setFormat(qsSpinNext);
             break;
     }
     if (status == f3_launcher_running ||
@@ -290,15 +306,13 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
     }
     else
     {
-        if (userMode == 1)
+        if (ui->tabWidget->currentIndex() == 1)
         {
             if (!ui->optionQuickTest->isChecked())
                 unmountDisk(mountPoint);
         }
         checking = false;
-        showProgressPage(false);
         ui->buttonCheck->setText("Check!");
-        ui->buttonMode->setEnabled(true);
         ui->textDev->setReadOnly(false);
         ui->textDevPath->setReadOnly(false);
         ui->buttonSelectDev->setEnabled(true);
@@ -368,6 +382,11 @@ void MainWindow::on_cuiError(f3_launcher_error_code errCode)
                                   "Currently f3 does not support quick test on "
                                   "device that is not backed by USB (e.g. mmc, scsi).");
             break;
+        case f3_launcher_not_device:
+            QMessageBox::critical(this,"Device type error",
+                                  "The device specified is a directory not a valid device.\n"
+                                  "Please make sure what you choose is a valid device.");
+            break;
         case f3_launcher_no_fix:
             QMessageBox::warning(this,"Probing Only",
                              "f3fix was not found.\n"
@@ -405,17 +424,18 @@ void MainWindow::on_buttonCheck_clicked()
     }
 
     QString inputPath;
-    if (userMode == 0)
+    if (ui->tabWidget->currentIndex() == 0)
         inputPath  = ui->textDevPath->text().trimmed();
     else
         inputPath = ui->textDev->text().trimmed();
+    
     if (inputPath.isEmpty())
     {
         QMessageBox::warning(this,"Warning","Please input the device path!");
         return;
     }
 
-    if (userMode == 0)
+    if (ui->tabWidget->currentIndex() == 0)
     {
         cui.setOption("mode", "legacy");
         cui.setOption("cache", "none");
@@ -509,7 +529,7 @@ void MainWindow::on_timerTimeout()
     else
     {
         timer.stop();
-        if (timerTarget < 100 && userMode == 1 && ui->optionQuickTest->isChecked())
+        if (timerTarget < 100 && ui->tabWidget->currentIndex() == 1 && ui->optionQuickTest->isChecked())
             promptFix();
     }
 }
@@ -519,32 +539,11 @@ void MainWindow::on_buttonHelp_clicked()
     help.show();
 }
 
-void MainWindow::on_buttonMode_clicked()
-{
-    if (this->userMode == 0)
-    {
-        this->userMode = 1;
-        showStatus("Switched to advanced mode.");
-        ui->stackedWidget->setCurrentIndex(1);
-        ui->buttonMode->setIcon(QIcon(":/icon/back.png"));
-        ui->buttonMode->setToolTip("Basic Mode");
-    }
-    else
-    {
-        this->userMode = 0;
-        showStatus("Switched to basic mode.");
-        ui->stackedWidget->setCurrentIndex(0);
-        ui->buttonMode->setIcon(QIcon(":/icon/advanced.png"));
-        ui->buttonMode->setToolTip("Advanced Mode");
-    }
-    showProgressPage(false);
-}
-
 void MainWindow::on_buttonSelectDev_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this,"Choose Device Path","/dev");
+    QString path = QFileDialog::getExistingDirectory(this,"Choose Device Path", "/dev");
     if (!path.isEmpty())
-        ui->textDev->setText(path);
+        ui->textDevPath->setText(path);
 }
 
 void MainWindow::on_optionQuickTest_clicked()

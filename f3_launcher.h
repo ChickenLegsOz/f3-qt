@@ -32,6 +32,7 @@ enum f3_launcher_error_code
     f3_launcher_no_report = 140,
     f3_launcher_oversize = 141,
     f3_launcher_damaged = 142,
+    f3_launcher_not_device = 143,
     f3_launcher_unknownError = 255,
 };
 
