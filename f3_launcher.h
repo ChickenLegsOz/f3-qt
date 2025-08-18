@@ -3,38 +3,42 @@
 #include <QtCore/QProcess>
 #include <QtCore/QTimer>
 #include <QtCore/QMap>
+#include <QScopedPointer>
 
 
-enum f3_launcher_status
-{
-    f3_launcher_ready = 0,
-    f3_launcher_running = 1,
-    f3_launcher_finished = 2,
-    f3_launcher_stopped = 3,
-    f3_launcher_staged = 4,
-    f3_launcher_progressed = 5,
+enum class F3Status {
+    Ready = 0,
+    Running = 1,
+    Finished = 2,
+    Stopped = 3,
+    Staged = 4,
+    Progressed = 5
 };
-enum f3_launcher_error_code
-{
-    f3_launcher_ok = 0,
-    f3_launcher_path_incorrect = 128,
-    f3_launcher_no_cui = 129,
-    f3_launcher_no_permission = 130,
-    f3_launcher_no_space = 131,
-    f3_launcher_no_progress = 132,
-    f3_launcher_no_quick = 133,
-    f3_launcher_cache_nofound = 134,
-    f3_launcher_no_memory = 135,
-    f3_launcher_not_directory = 136,
-    f3_launcher_not_disk = 137,
-    f3_launcher_not_USB = 138,
-    f3_launcher_no_fix = 139,
-    f3_launcher_no_report = 140,
-    f3_launcher_oversize = 141,
-    f3_launcher_damaged = 142,
-    f3_launcher_not_device = 143,
-    f3_launcher_unknownError = 255,
+
+enum class F3Error {
+    Ok = 0,
+    PathIncorrect = 128,
+    NoCui = 129,
+    NoPermission = 130,
+    NoSpace = 131,
+    NoProgress = 132,
+    NoQuick = 133,
+    CacheNotFound = 134,
+    NoMemory = 135,
+    NotDirectory = 136,
+    NotDisk = 137,
+    NotUSB = 138,
+    NoFix = 139,
+    NoReport = 140,
+    Oversize = 141,
+    Damaged = 142,
+    NotDevice = 143,
+    Unknown = 255
 };
+
+// For backward compatibility
+using f3_launcher_status = F3Status;
+using f3_launcher_error_code = F3Error;
 
 struct f3_launcher_report
 {
@@ -74,15 +78,15 @@ signals:
     void f3_launcher_error(f3_launcher_error_code errCode);
 
 private:
-    QProcess f3_cui;
-    QTimer timer;
+    QScopedPointer<QProcess> f3_cui;
+    QScopedPointer<QTimer> timer;
     QString devPath;
     QString f3_path;
     QMap<QString,QString> options;
     bool showProgress;
     int stage;
-    f3_launcher_status status;
-    f3_launcher_error_code errCode;
+    F3Status status;
+    F3Error errCode;
 
     void emitError(f3_launcher_error_code errorCode);
     bool probeCommand(QString command);

@@ -146,10 +146,11 @@ QString f3_operation_speed(const QString& operation,qint64 blockSize)
             .append("/s");
 }
 
-f3_launcher::f3_launcher()
+f3_launcher::f3_launcher() :
+    f3_cui(new QProcess(this)),
+    timer(new QTimer(this)),
+    errCode(F3Error::Ok)
 {
-    errCode = f3_launcher_ok;
-
     f3_path = "./";
     float version = probeVersion();
     if (version == 0)
@@ -159,25 +160,25 @@ f3_launcher::f3_launcher()
     }
     if (version == 0)
     {
-        emitError(f3_launcher_no_cui);
+        emitError(F3Error::NoCui);
         return;
     }
     if (version < 4.0 || !probeCommand(F3_PROBE_COMMAND))
     {
-        emitError(f3_launcher_no_quick);
+        emitError(F3Error::NoQuick);
     }
     if (version < 5.0 || !probeCommand(F3_FIX_COMMAND))
     {
-        emitError(f3_launcher_no_fix);
+        emitError(F3Error::NoFix);
     }
     if (version <= 6.0)
     {
-        emitError(f3_launcher_no_progress);
+        emitError(F3Error::NoProgress);
         showProgress = false;
     }
     else
     {
-        emit f3_launcher_status_changed(f3_launcher_ready);
+        emit f3_launcher_status_changed(F3Status::Ready);
         showProgress = true;
     }
 
@@ -188,15 +189,15 @@ f3_launcher::f3_launcher()
     options["autofix"] = "no";
 
     stage = 0;
-    connect(&f3_cui, &QProcess::finished, this, &f3_launcher::on_f3_cui_finished);
-    connect(&timer, &QTimer::timeout, this, &f3_launcher::on_timer_timeout);
-    timer.setInterval(200);
+    connect(f3_cui.data(), &QProcess::finished, this, &f3_launcher::on_f3_cui_finished);
+    connect(timer.data(), &QTimer::timeout, this, &f3_launcher::on_timer_timeout);
+    timer->setInterval(200);
 
 }
 
 f3_launcher::~f3_launcher()
 {
-    f3_cui.terminate();
+    f3_cui->terminate();
 }
 
 void f3_launcher::emitError(f3_launcher_error_code errorCode)
@@ -235,8 +236,8 @@ void f3_launcher::startCheck(QString devPath)
 
     f3_cui_output.clear();
     progress10K = 0;
-    status = f3_launcher_running;
-    emit f3_launcher_status_changed(f3_launcher_running);
+    status = F3Status::Running;
+    emit f3_launcher_status_changed(F3Status::Running);
 
     this->devPath = devPath;
     QString command;
@@ -246,9 +247,9 @@ void f3_launcher::startCheck(QString devPath)
         command = QString(F3_PROBE_COMMAND);
         if (!probeCommand(command))
         {
-            emitError(f3_launcher_no_quick);
-            status = f3_launcher_stopped;
-            emit f3_launcher_status_changed(f3_launcher_stopped);
+            emitError(F3Error::NoQuick);
+            status = F3Status::Stopped;
+            emit f3_launcher_status_changed(F3Status::Stopped);
             return;
         }
         if (getOption("memory") == "minimum")
@@ -257,7 +258,7 @@ void f3_launcher::startCheck(QString devPath)
             args << QString(F3_OPTION_DESTRUCTIVE);
         args << QString(F3_OPTION_TIME);
         stage = 11;
-        emit f3_launcher_status_changed(f3_launcher_staged);
+        emit f3_launcher_status_changed(F3Status::Staged);
     }
     else
     {
@@ -271,25 +272,25 @@ void f3_launcher::startCheck(QString devPath)
                 stage = 2;
             }
             else
-                emitError(f3_launcher_cache_nofound);
+                emitError(F3Error::CacheNotFound);
         }
         if (showProgress)
             args << QString(F3_OPTION_SHOW_PROGRESS);
-        emit f3_launcher_status_changed(f3_launcher_staged);
+        emit f3_launcher_status_changed(F3Status::Staged);
     }
     args << devPath;
-    f3_cui.start(command.prepend(f3_path), args);
+    f3_cui->start(command.prepend(f3_path), args);
 
     if (showProgress)
     {
-        timer.start();
+        timer->start();
     }
 }
 
 void f3_launcher::stopCheck()
 {
-    f3_cui.terminate();
-    f3_cui.waitForFinished();
+    f3_cui->terminate();
+    f3_cui->waitForFinished();
 }
 
 f3_launcher_report f3_launcher::getReport()
@@ -369,7 +370,7 @@ void f3_launcher::startFix()
     f3_launcher_report report = getReport();
     if (report.success ==false || report.BlockSize.isEmpty() || report.ActualFree.isEmpty())
     {
-        emitError(f3_launcher_no_report);
+        emitError(F3Error::NoReport);
         return;
     }
     else
@@ -385,23 +386,23 @@ void f3_launcher::startFix()
     qint64 blockCount = sizeInByte / blockSizeInByte;
 
     f3_cui_output.clear();
-    status = f3_launcher_running;
-    emit f3_launcher_status_changed(f3_launcher_running);
+    status = F3Status::Running;
+    emit f3_launcher_status_changed(F3Status::Running);
     stage = 21;
-    emit f3_launcher_status_changed(f3_launcher_staged);
+    emit f3_launcher_status_changed(F3Status::Staged);
     QStringList args;
     args << "-l" << QString::number(blockCount);
     args << devPath;
-    f3_cui.start(QString(F3_FIX_COMMAND).prepend(f3_path), args);
+    f3_cui->start(QString(F3_FIX_COMMAND).prepend(f3_path), args);
 }
 
 bool f3_launcher::probeCommand(QString command)
 {
-    f3_cui.start(command.prepend(f3_path));
-    f3_cui.waitForStarted();
-    f3_cui.waitForFinished();
-    if (f3_cui.exitCode() == 255 || 
-        f3_cui.error() == QProcess::FailedToStart)
+    f3_cui->start(command.prepend(f3_path));
+    f3_cui->waitForStarted();
+    f3_cui->waitForFinished();
+    if (f3_cui->exitCode() == 255 || 
+        f3_cui->error() == QProcess::FailedToStart)
         return false;
     else
         return true;
@@ -412,7 +413,7 @@ float f3_launcher::probeVersion()
     if (!probeCommand(F3_WRITE_COMMAND) || !probeCommand(F3_READ_COMMAND))
         return 0;
 
-    QString output = f3_cui.readAllStandardError();
+    QString output = f3_cui->readAllStandardError();
     int p = output.indexOf(F3_VERSION_TAG1);
     if (p > 0)
     {
@@ -479,61 +480,61 @@ bool f3_launcher::probeCacheFile(QString& devPath)
 
 int f3_launcher::parseOutput()
 {
-    int exitCode = f3_cui.exitCode();
+    int exitCode = f3_cui->exitCode();
     switch(exitCode)
     {
         case 0:
             //Exit normally || Inaccessible
-            f3_cui_output.append(f3_cui.readAllStandardOutput());
+            f3_cui_output.append(f3_cui->readAllStandardOutput());
             if (f3_cui_output.indexOf(F3_ERROR_TAG_INACCESSIBLE) >= 0)
-                emitError(f3_launcher_damaged);
+                emitError(F3Error::Damaged);
             break;
         case 1:
             //No space || No memory || Not root || Not disk ||
             //Not USB || Oversize
-            f3_cui_output = f3_cui.readAllStandardOutput();
-            f3_cui_output.append(f3_cui.readAllStandardError());
+            f3_cui_output = f3_cui->readAllStandardOutput();
+            f3_cui_output.append(f3_cui->readAllStandardError());
             if (f3_cui_output.indexOf(F3_ERROR_TAG_NO_SPACE) >= 0)
-                emitError(f3_launcher_no_space);
+                emitError(F3Error::NoSpace);
             else if (f3_cui_output.indexOf(F3_ERROR_TAG_NO_MEM) >=0 )
-                emitError(f3_launcher_no_memory);
+                emitError(F3Error::NoMemory);
             else if (f3_cui_output.indexOf(F3_ERROR_TAG_NOT_DISK) >= 0)
-                emitError(f3_launcher_not_disk);
+                emitError(F3Error::NotDisk);
             else if (f3_cui_output.indexOf(F3_ERROR_TAG_NOT_ROOT) >= 0)
-                emitError(f3_launcher_no_permission);
+                emitError(F3Error::NoPermission);
             else if (f3_cui_output.indexOf(F3_ERROR_TAG_NOT_USB) >= 0)
-                emitError(f3_launcher_not_USB);
+                emitError(F3Error::NotUSB);
             else if (f3_cui_output.indexOf(F3_ERROR_TAG_OVERSIZE) >= 0)
-                emitError(f3_launcher_oversize);
+                emitError(F3Error::Oversize);
             else
                 f3_cui_output.clear();
             break;
         case 2:     //Path not exists
-            emitError(f3_launcher_path_incorrect);
+            emitError(F3Error::PathIncorrect);
             break;
         case 13:   //Permission denied
-            emitError(f3_launcher_no_permission);
+            emitError(F3Error::NoPermission);
         case 15:    //Terminated manually
             break;
         case 20:    //Not directory
-            emitError(f3_launcher_not_directory);
+            emitError(F3Error::NotDirectory);
             break;
         case 21:    //Tried to open a directory instead of a device
-            emitError(f3_launcher_not_device);
+            emitError(F3Error::NotDevice);
         case 64:    //No argument
             break;
         case 143:   //Terminated by other process
             break;
         default:
-            f3_cui_output = QString("Error:\n").append(f3_cui.readAllStandardError());
-            emitError(f3_launcher_unknownError);
+            f3_cui_output = QString("Error:\n").append(f3_cui->readAllStandardError());
+            emitError(F3Error::Unknown);
     }
     return exitCode;
 }
 
 void f3_launcher::on_f3_cui_finished()
 {
-    timer.stop();
+    timer->stop();
     if (stage == 0)
         return;
     else if (stage == 1)
@@ -541,8 +542,8 @@ void f3_launcher::on_f3_cui_finished()
         if (parseOutput() != 0)
         {
             stage = 0;
-            status = f3_launcher_stopped;
-            emit f3_launcher_status_changed(f3_launcher_stopped);
+            status = F3Status::Stopped;
+            emit f3_launcher_status_changed(F3Status::Stopped);
             return;
         }
 
@@ -552,12 +553,12 @@ void f3_launcher::on_f3_cui_finished()
         if (showProgress)
             args << QString(F3_OPTION_SHOW_PROGRESS);
         args << devPath;
-        f3_cui.start(QString(F3_READ_COMMAND).prepend(f3_path),args);
-        emit f3_launcher_status_changed(f3_launcher_staged);
+        f3_cui->start(QString(F3_READ_COMMAND).prepend(f3_path),args);
+        emit f3_launcher_status_changed(F3Status::Staged);
 
         if (showProgress)
         {
-            timer.start();
+            timer->start();
         }
     }
     else if (stage == 11 && options["autofix"] == "true")
@@ -570,20 +571,20 @@ void f3_launcher::on_f3_cui_finished()
 
         if (parseOutput() == 0)
         {
-            status = f3_launcher_finished;
-            emit f3_launcher_status_changed(f3_launcher_finished);            
+            status = F3Status::Finished;
+            emit f3_launcher_status_changed(F3Status::Finished);            
         }
         else
         {
-            status = f3_launcher_stopped;
-            emit f3_launcher_status_changed(f3_launcher_stopped);
+            status = F3Status::Stopped;
+            emit f3_launcher_status_changed(F3Status::Stopped);
         }
     }
 }
 
 void f3_launcher::on_timer_timeout()
 {
-    QString temp = f3_cui.readAllStandardOutput();
+    QString temp = f3_cui->readAllStandardOutput();
     if (temp.isEmpty()) return;
     temp.remove(QChar('\b'));
     int p = temp.indexOf("% --");
@@ -593,7 +594,7 @@ void f3_launcher::on_timer_timeout()
         float percentage10K = temp.mid(p2 + 4, p - p2 - 4).trimmed().toFloat() * 100.0f;
         if (percentage10K > progress10K)
             progress10K = percentage10K;
-        emit f3_launcher_status_changed(f3_launcher_progressed);
+        emit f3_launcher_status_changed(F3Status::Progressed);
     }
     f3_cui_output.append(temp);
 }

@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QLabel>
 #include <QProgressBar>
+#include <memory>
 #include "f3_launcher.h"
 #include "helpwindow.h"
 
@@ -36,15 +37,15 @@ private slots:
     void on_buttonHideResult_clicked();
 
 private:
-    Ui::MainWindow *ui;
+    std::unique_ptr<Ui::MainWindow> ui;
     f3_launcher cui;
     QTimer timer;
     HelpWindow help;
     bool checking;
     int timerTarget;
     QString mountPoint;
-    QLabel *currentStatus;
-    QProgressBar *progressBar;
+    std::unique_ptr<QLabel> currentStatus;
+    std::unique_ptr<QProgressBar> progressBar;
 
     void showStatus(const QString& string);
     void clearStatus();

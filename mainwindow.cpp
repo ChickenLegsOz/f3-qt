@@ -28,41 +28,41 @@ void f3_qt_fillReport(f3_launcher_report &report)
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow)
+    ui(new Ui::MainWindow),
+    currentStatus(new QLabel(this)),
+    progressBar(new QProgressBar(this))
 {    
-    f3_launcher_error_code cuiError = cui.getErrCode();
-    if (cuiError != 0)
+    F3Error cuiError = cui.getErrCode();
+    if (cuiError != F3Error::Ok)
         on_cuiError(cuiError);
 
     ui->setupUi(this);
-    QStatusBar *statusBar = new QStatusBar(this);
+    auto statusBar = new QStatusBar(this);
     setStatusBar(statusBar);
 
-    // Create and configure the label
-    currentStatus = new QLabel(this);
+    // Configure the label
     currentStatus->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     currentStatus->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     currentStatus->setMinimumWidth(200);
 
-    // Create and configure the progress bar
-    progressBar = new QProgressBar(this);
+    // Configure the progress bar
     progressBar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
     progressBar->setVisible(false);
     progressBar->setTextVisible(true);
 
-    // Create container widget and layout
-    QWidget *statusWidget = new QWidget(this);
+    // Create container widget and layout with smart pointer
+    auto statusWidget = std::unique_ptr<QWidget>(new QWidget(this));
     statusWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    QHBoxLayout *statusLayout = new QHBoxLayout(statusWidget);
+    auto statusLayout = new QHBoxLayout(statusWidget.get());
     statusLayout->setContentsMargins(0, 0, 0, 0);
 
     // Add widgets to layout
-    statusLayout->addWidget(currentStatus);
+    statusLayout->addWidget(currentStatus.get());
     statusLayout->addStretch(1);  // Use addStretch instead of QSpacerItem
-    statusLayout->addWidget(progressBar);
+    statusLayout->addWidget(progressBar.get());
 
     // Add to status bar
-    statusBar->addWidget(statusWidget, 1);  // Use addWidget with stretch
+    statusBar->addWidget(statusWidget.release(), 1);  // Transfer ownership to status bar
     connect(&cui, &f3_launcher::f3_launcher_status_changed, this, &MainWindow::on_cuiStatusChanged);
     connect(&cui, &f3_launcher::f3_launcher_error, this, &MainWindow::on_cuiError);
     connect(&timer, &QTimer::timeout, this, &MainWindow::on_timerTimeout);
@@ -80,7 +80,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-    delete ui;
+    // Smart pointers will clean up automatically
 }
 
 void MainWindow::showStatus(const QString &string)
@@ -208,28 +208,28 @@ QString MainWindow::mountDisk(const QString& device)
         return QString();
     }
     
-    // Setup and execute mount command
-    QProcess cui;
+    // Setup and execute mount command with smart pointer
+    auto proc = std::unique_ptr<QProcess>(new QProcess());
     QStringList args;
     args << sanitizedDevice << mountDir;
     
-    cui.start("mount", args);
-    if (!cui.waitForStarted(5000)) {  // 5 second timeout
+    proc->start("mount", args);
+    if (!proc->waitForStarted(5000)) {  // 5 second timeout
         dir.rmdir(mountDir);
         QMessageBox::critical(this, "Mount Error", "Failed to start mount command.");
         return QString();
     }
     
-    if (!cui.waitForFinished(30000)) {  // 30 second timeout
-        cui.terminate();
-        cui.waitForFinished(5000);
+    if (!proc->waitForFinished(30000)) {  // 30 second timeout
+        proc->terminate();
+        proc->waitForFinished(5000);
         dir.rmdir(mountDir);
         QMessageBox::critical(this, "Mount Error", "Mount operation timed out.");
         return QString();
     }
     
-    if (cui.exitCode() != 0) {
-        QString errorOutput = QString::fromUtf8(cui.readAllStandardError());
+    if (proc->exitCode() != 0) {
+        QString errorOutput = QString::fromUtf8(proc->readAllStandardError());
         dir.rmdir(mountDir);
         QMessageBox::critical(this, "Mount Error", 
             QString("Failed to mount device.\nError: %1").arg(errorOutput.isEmpty() ? "Unknown error" : errorOutput));
@@ -261,26 +261,26 @@ bool MainWindow::unmountDisk(const QString& mountPoint)
         return false;
     }
     
-    // Setup and execute unmount command
-    QProcess cui;
+    // Setup and execute unmount command with smart pointer
+    auto proc = std::unique_ptr<QProcess>(new QProcess());
     QStringList args;
     args << sanitizedMountPoint;
     
-    cui.start("umount", args);
-    if (!cui.waitForStarted(5000)) {  // 5 second timeout
+    proc->start("umount", args);
+    if (!proc->waitForStarted(5000)) {  // 5 second timeout
         QMessageBox::critical(this, "Unmount Error", "Failed to start unmount command.");
         return false;
     }
     
-    if (!cui.waitForFinished(30000)) {  // 30 second timeout
-        cui.terminate();
-        cui.waitForFinished(5000);
+    if (!proc->waitForFinished(30000)) {  // 30 second timeout
+        proc->terminate();
+        proc->waitForFinished(5000);
         QMessageBox::critical(this, "Unmount Error", "Unmount operation timed out.");
         return false;
     }
     
-    if (cui.exitCode() != 0) {
-        QString errorOutput = QString::fromUtf8(cui.readAllStandardError());
+    if (proc->exitCode() != 0) {
+        QString errorOutput = QString::fromUtf8(proc->readAllStandardError());
         QMessageBox::critical(this, "Unmount Error", 
             QString("Failed to unmount device.\nError: %1").arg(errorOutput.isEmpty() ? "Unknown error" : errorOutput));
         return false;
@@ -336,15 +336,15 @@ void MainWindow::promptFix()
     cui.startFix();
 }
 
-void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
+void MainWindow::on_cuiStatusChanged(F3Status status)
 {
     QString qsSpinNext;
     switch(status)
     {
-        case f3_launcher_ready:
+        case F3Status::Ready:
             showStatus("Ready.");
             break;
-        case f3_launcher_running:
+        case F3Status::Running:
             showStatus("Checking... Please wait...");
             ui->textDev->setReadOnly(true);
             ui->textDevPath->setReadOnly(true);
@@ -352,7 +352,7 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
             ui->buttonSelectPath->setEnabled(false);
             progressBar->setVisible(true);
             break;
-        case f3_launcher_finished:
+        case F3Status::Finished:
         {
             f3_launcher_report report = cui.getReport();
             
@@ -388,12 +388,12 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
             showResultPage(true);
             break;
         }
-        case f3_launcher_stopped:
+        case F3Status::Stopped:
             showStatus("Stopped.");
             showProgress(0);
             progressBar->setFormat("!");
             break;
-        case f3_launcher_staged:
+        case F3Status::Staged:
         {
             QString progressText = QString("Progress: (Stage %1)").arg(cui.getStage());
             showStatus(progressText);
@@ -401,7 +401,7 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
             progressBar->setFormat("?");
             break;
         }
-        case f3_launcher_progressed:
+        case F3Status::Progressed:
             showProgress(cui.progress10K);
             switch(progressBar->format()[0].toLatin1()){
                 case '|': qsSpinNext = "/"; break;
@@ -413,9 +413,9 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
             progressBar->setFormat(qsSpinNext);
             break;
     }
-    if (status == f3_launcher_running ||
-        status == f3_launcher_staged ||
-        status == f3_launcher_progressed)
+    if (status == F3Status::Running ||
+        status == F3Status::Staged ||
+        status == F3Status::Progressed)
     {
         checking = true;
         ui->buttonCheck->setText("Stop");
@@ -436,88 +436,88 @@ void MainWindow::on_cuiStatusChanged(f3_launcher_status status)
     }
 }
 
-void MainWindow::on_cuiError(f3_launcher_error_code errCode)
+void MainWindow::on_cuiError(F3Error errCode)
 {
     switch(errCode)
     {
-        case f3_launcher_no_cui:
+        case F3Error::NoCui:
             QMessageBox::critical(this,"No f3 program",
                                   "Cannot find f3read/f3write.\n"
                                   "Please install f3 first.");
             exit(0);
-        case f3_launcher_no_progress:
+        case F3Error::NoProgress:
             QMessageBox::warning(this,"No progress showing",
                                  "You are using an old version of f3read/f3write.\n"
                                  "The progress will not be shown during checking.");
             break;
-        case f3_launcher_path_incorrect:
+        case F3Error::PathIncorrect:
             QMessageBox::critical(this,"Path error",
                               "Device path not found.\n"
                               "Please try mounting it correctly.");
             break;
-        case f3_launcher_no_permission:
+        case F3Error::NoPermission:
             QMessageBox::warning(this,"Permission denied",
                           "Cannot write to device.\n"
                           "Try to re-run with sudo.");
             showStatus("No enough space for test.");
             break;
-        case f3_launcher_no_space:
+        case F3Error::NoSpace:
             QMessageBox::information(this,"No space",
                           "No enough space for checking.\n"
                           "Please delete some file, or format the device and try again.");
             showStatus("No enough space for test.");
             break;
-        case f3_launcher_no_quick:
+        case F3Error::NoQuick:
             QMessageBox::warning(this,"Legacy Mode Only",
                                  "f3probe was not found.\n"
                                  "We are not able to test under quick mode.");
             break;
-        case f3_launcher_cache_nofound:
+        case F3Error::CacheNotFound:
             showStatus("No cached data found. Test from writing...");
             break;
-        case f3_launcher_no_memory:
+        case F3Error::NoMemory:
             QMessageBox::warning(this,"Out of memory",
                                  "No enough memory for checking.\n"
                                  "You may try again with following options:\n"
                                  "  -Use less memory\n"
                                  "  -Destructive Test");
             break;
-        case f3_launcher_not_directory:
+        case F3Error::NotDirectory:
             QMessageBox::critical(this,"Path error",
                               "The path specified is not a directory.\n");
             break;
-        case f3_launcher_not_disk:
+        case F3Error::NotDisk:
             QMessageBox::critical(this,"Device type error",
                                   "The device specified is not a disk.\n"
                                   "Please make sure what you choose is a disk,"
                                   " not a partition.");
             break;
-        case f3_launcher_not_USB:
+        case F3Error::NotUSB:
             QMessageBox::critical(this,"Device type error",
                                   "The device specified is not a USB device.\n"
                                   "Currently f3 does not support quick test on "
                                   "device that is not backed by USB (e.g. mmc, scsi).");
             break;
-        case f3_launcher_not_device:
+        case F3Error::NotDevice:
             QMessageBox::critical(this,"Device type error",
                                   "The device specified is a directory not a valid device.\n"
                                   "Please make sure what you choose is a valid device.");
             break;
-        case f3_launcher_no_fix:
+        case F3Error::NoFix:
             QMessageBox::warning(this,"Probing Only",
                              "f3fix was not found.\n"
                              "We are not able to fix the disk if its capacity is wrong.");
             break;
-        case f3_launcher_no_report:
+        case F3Error::NoReport:
             QMessageBox::warning(this,"No test result",
                                  "No test has been completed. Please run a test first.");
             break;
-        case f3_launcher_oversize:
+        case F3Error::Oversize:
             QMessageBox::critical(this,"Fix failed",
                                   "Cannot use detected capacity for fixing.\n"
                                   "You may need to report this as a bug.");
             break;
-        case f3_launcher_damaged:
+        case F3Error::Damaged:
             QMessageBox::critical(this,"Device inaccessible",
                                   "Cannot access the specified device.\n"
                                   "You may not have the right permission to"
