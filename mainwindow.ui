@@ -23,7 +23,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>500</width>
+     <width>600</width>
      <height>20</height>
     </rect>
    </property>
@@ -40,7 +40,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>500</width>
+    <width>600</width>
     <height>400</height>
    </rect>
   </property>
@@ -307,6 +307,53 @@
            </size>
           </property>
          </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tabWidgetDevices">
+       <attribute name="title">
+        <string>Devices</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayoutDevices">
+        <item>
+         <widget class="QLabel" name="labelDevicesInfo">
+          <property name="text">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use these commands to identify device locations (e.g., /dev/sdb) that can be used in the Basic and Advanced tabs.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayoutDeviceButtons">
+          <item>
+           <widget class="QPushButton" name="buttonLsblk">
+            <property name="text">
+             <string>List Block Devices (lsblk)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="buttonFdisk">
+            <property name="text">
+             <string>List Partitions (fdisk)</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QPlainTextEdit" name="deviceOutput">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="font">
+           <font>
+            <family>Monospace</family>
+           </font>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>

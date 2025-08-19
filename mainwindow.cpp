@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "helpwindow.h"
 #include "aboutdialog.h"
+#include "passworddialog.h"
 #include <QDebug>
 #include <QMessageBox>
 #include <QScreen>
@@ -14,6 +15,8 @@
 #include <QStatusBar>
 #include <QCryptographicHash>
 #include <QStyle>
+#include <QProcess>
+#include <QTextStream>
 
 void f3_qt_fillReport(f3_launcher_report &report)
 {
@@ -103,7 +106,6 @@ void MainWindow::clearStatus()
     ui->labelSpace->clear();
     ui->labelSpeed->clear();
     progressBar->setValue(0);
-    //progressBar->setVisible(false);
     showResultPage(false);
 }
 
@@ -178,10 +180,10 @@ void MainWindow::showCapacity(int value)
 void MainWindow::showResultPage(bool visible)
 {
     if (visible) {
-        ui->tabWidget->setTabVisible(2, true);
-        ui->tabWidget->setCurrentIndex(2);
+        ui->tabWidget->setTabVisible(3, true);
+        ui->tabWidget->setCurrentIndex(3);
     } else {
-        ui->tabWidget->setTabVisible(2, false);
+        ui->tabWidget->setTabVisible(3, false);
         ui->tabWidget->setCurrentIndex(0);
     }
 }
@@ -770,4 +772,52 @@ void MainWindow::on_optionDestructive_clicked()
 void MainWindow::on_buttonHideResult_clicked()
 {
     showResultPage(false);
+}
+
+void MainWindow::executeCommand(const QString &command, bool requiresSudo)
+{
+    QString finalCommand = command;
+    QString password;
+    
+    if (requiresSudo) {
+        PasswordDialog dialog(this);
+        if (dialog.exec() != QDialog::Accepted) {
+            return;
+        }
+        password = dialog.getPassword();
+        finalCommand = QString("echo \"%1\" | sudo -S %2").arg(password, command);
+    }
+
+    QProcess process;
+    process.start("bash", QStringList() << "-c" << finalCommand);
+    process.waitForFinished(-1);
+
+    QString output = QString::fromUtf8(process.readAllStandardOutput());
+    QString error = QString::fromUtf8(process.readAllStandardError());
+
+    if (process.exitCode() != 0) {
+        if (error.contains("incorrect password")) {
+            QMessageBox::critical(this, "Error", "Incorrect sudo password.");
+        } else {
+            QMessageBox::critical(this, "Error", "Command failed: " + error);
+        }
+        return;
+    }
+
+    updateDeviceOutput(output);
+}
+
+void MainWindow::updateDeviceOutput(const QString &output)
+{
+    ui->deviceOutput->setPlainText(output);
+}
+
+void MainWindow::on_buttonLsblk_clicked()
+{
+    executeCommand("lsblk -o NAME,SIZE,TYPE,MOUNTPOINT", false);
+}
+
+void MainWindow::on_buttonFdisk_clicked()
+{
+    executeCommand("fdisk -l", true);
 }

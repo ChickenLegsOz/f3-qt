@@ -34,6 +34,7 @@ add_executable(f3-qt WIN32 MACOSX_BUNDLE
     aboutdialog.cpp aboutdialog.h aboutdialog.ui
     f3_launcher.cpp f3_launcher.h
     helpwindow.cpp helpwindow.h helpwindow.ui
+    passworddialog.cpp passworddialog.h
     main.cpp
     mainwindow.cpp mainwindow.h mainwindow.ui
 )

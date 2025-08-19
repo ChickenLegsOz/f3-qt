@@ -62,6 +62,12 @@ private:
 
 protected:
     void closeEvent(QCloseEvent *);
+
+private slots:
+    void on_buttonLsblk_clicked();
+    void on_buttonFdisk_clicked();
+    void executeCommand(const QString &command, bool requiresSudo = false);
+    void updateDeviceOutput(const QString &output);
 };
 
 #endif // MAINWINDOW_H
