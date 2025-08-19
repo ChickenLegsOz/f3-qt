@@ -27,6 +27,8 @@ private slots:
     void on_buttonExit_clicked();
     void on_buttonSelectPath_clicked();
     void on_buttonHelp_clicked();
+    void on_actionHelp_triggered();
+    void on_actionAbout_triggered();
     void on_timerTimeout();
     void on_cuiStatusChanged(f3_launcher_status status);
     void on_cuiError(f3_launcher_error_code errCode);

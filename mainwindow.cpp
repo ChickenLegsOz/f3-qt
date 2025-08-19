@@ -1,7 +1,9 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "helpwindow.h"
+#include "aboutdialog.h"
 #include <QDebug>
+#include <QMessageBox>
 #include <QScreen>
 #include <QLabel>
 #include <QGuiApplication>
@@ -42,6 +44,9 @@ MainWindow::MainWindow(QWidget *parent) :
     auto statusBar = new QStatusBar(this);
     setStatusBar(statusBar);
 
+    // Connect help action
+    connect(ui->actionHelp, &QAction::triggered, this, &MainWindow::on_buttonHelp_clicked);
+
     // Configure the label
     currentStatus->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     currentStatus->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -69,9 +74,6 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(&cui, &f3_launcher::f3_launcher_error, this, &MainWindow::on_cuiError);
     connect(&timer, &QTimer::timeout, this, &MainWindow::on_timerTimeout);
     checking = false;
-
-    // Set help button icon
-    ui->buttonHelp->setIcon(QApplication::style()->standardIcon(QStyle::SP_DialogHelpButton));
     
     // Center window on screen
     QScreen *screen = QGuiApplication::primaryScreen();
@@ -80,7 +82,8 @@ MainWindow::MainWindow(QWidget *parent) :
         move((screenGeometry.width() - width()) / 2 + screenGeometry.left(),
              (screenGeometry.height() - height()) / 2 + screenGeometry.top());
     }
-    setFixedSize(width(), height());
+    // Set minimum size but allow resizing
+    setMinimumSize(400, 350);
     clearStatus();
 }
 
@@ -718,6 +721,17 @@ void MainWindow::on_timerTimeout()
 void MainWindow::on_buttonHelp_clicked()
 {
     help.show();
+}
+
+void MainWindow::on_actionHelp_triggered()
+{
+    help.show();
+}
+
+void MainWindow::on_actionAbout_triggered()
+{
+    AboutDialog about(this);
+    about.exec();
 }
 
 void MainWindow::on_buttonSelectDev_clicked()

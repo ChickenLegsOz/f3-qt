@@ -7,22 +7,20 @@ HelpWindow::HelpWindow(QWidget *parent) :
     ui(new Ui::HelpWindow)
 {
     ui->setupUi(this);
-    setFixedSize(width(), height());
-    ui->labelVersion->setText(QString("Ver: ") + APP_VERSION);
-    ui->textAbout->setText("This program is a free software.\n\n"
-                    "You can redistribute it and/or modify it under the terms of "
-                    "the GNU Library General Public License as published by "
-                    "the Free Software Foundation; either version 3 of the License, "
-                    "or (at your option) any later version.\n\n"
-                    "This package is distributed in the hope that it will be useful, but WITHOUT "
-                    "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or "
-                    "FITNESS FOR A PARTICULAR PURPOSE. See the GNU Library General Public License "
-                    "for more details.\n");
-    ui->labelContact->setText("<p>Qt6 GUI Author: Ryan McFadden &lt;<a href=\"mailto:Ryan.McFadden@outlook.com.au\">Ryan.McFadden@outlook.com.au</a>&gt;</p>"
-                    "<p>GUI Author: Tianze Wang &lt;<a href=\"mailto:zwpwjwtz@126.com\">zwpwjwtz@126.com</a>&gt;</p>"
-                    "<p>Author of F3: Michel Machado &lt;<a href=\"mailto:michel@digirati.com.br\">michel@digirati.com.br</a>&gt;</p>"
-                    "<p>Project Home: <a href=\"https://github.com/zwpwjwtz/f3-qt\">Github</a>"
-                    "<p align=\"center\">Feel free to report bugs and give suggestions!</p>");
+    
+    QString helpText;
+    helpText = "<h3>About F3</h3>\n"
+               "<p>This program is a free software.</p>\n\n"
+               "<p>You can redistribute it and/or modify it under the terms of "
+               "the GNU Library General Public License as published by "
+               "the Free Software Foundation; either version 3 of the License, "
+               "or (at your option) any later version.</p>\n\n"
+               "<p>This package is distributed in the hope that it will be useful, but WITHOUT "
+               "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or "
+               "FITNESS FOR A PARTICULAR PURPOSE. See the GNU Library General Public License "
+               "for more details.</p>\n";
+    
+    ui->helpBrowser->setHtml(helpText);
 }
 
 HelpWindow::~HelpWindow()
