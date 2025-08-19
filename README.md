@@ -1,6 +1,6 @@
 # Fight Flash Fraud (Qt)
 
-This is a simple GUI for F3 - [Fight Flash Fraud](https://github.com/AltraMayor/f3).
+This is a simple GUI for F3 - [Fight Flash Fraud](https://github.com/ChickenLegsOz/f3-qt).
 
 ![](./screenshot.png)
 

@@ -1,50 +1,98 @@
 How To Build And Install
 ========================
 
+Dependencies
+-----------
+
+Before building, ensure you have the following dependencies installed:
+
+* CMake (3.16 or later)
+* Qt6 development packages
+* C++ compiler with C++17 support
+* F3 (Fight Flash Fraud) utility
+
+For example, on Ubuntu/Debian:
+```bash
+sudo apt-get update
+sudo apt-get install build-essential cmake qt6-base-dev f3
+```
+
+For Fedora:
+```bash
+sudo dnf install cmake qt6-qtbase-devel gcc-c++ f3
+```
+
+For Arch Linux:
+```bash
+sudo pacman -S cmake qt6-base gcc f3
+```
+
 Build
 -----
 
-There are 2 ways to build from source:
+There are 3 ways to build from source:
 
-* Using QtCreator:
+1. Using CMake (Recommended):
 
-  1. Download and install the latest version of QtCreator;
-    
-  2. Open "f3-qt.pro" with QtCreator;
-    
-  3. Compile the project.
+```bash
+# Create and enter a build directory
+mkdir build && cd build
 
-* Using qmake:
+# Configure the project
+cmake ..
 
-  1. Download and install qmake. There might be other dependencies needed for qmake. For example, under Ubuntu you can:
+# Build
+make
 
-            sudo apt-get install g++
-            sudo apt-get install qt6-base-dev
+# Install (optional)
+sudo make install
+```
 
-  2. Switch to the source directory and run qmake:
-    
-            cd f3-qt/
-            qmake6
-    
-  3. Actually build the project:
-    
-            make
-        
+2. Using QtCreator:
 
-Install
--------
+   1. Download and install the latest version of QtCreator
+   2. Open "CMakeLists.txt" with QtCreator
+   3. Configure and build the project using QtCreator's interface
 
-The built executable "f3-qt" can be launched directly (either from terminal or file manager), without further configuration of environmental variables.
+3. Using qmake (Legacy method):
 
-**To make the program function properly, you need also install the latest version of f3.**
+```bash
+qmake6
+make
+```
 
+Installation
+-----------
 
-Install with package manager
--------
+After building, you can:
 
-* Archlinux
+1. Install system-wide (if built with CMake):
+```bash
+sudo make install
+```
 
-  Using an AUR helper such as "yay":
+2. Run directly from the build directory:
+```bash
+./f3-qt
+```
 
-            yay -S f3-qt
+The program will be installed to `/usr/local/bin` by default when using `make install`.
+
+Package Manager Installation
+--------------------------
+
+* Arch Linux:
+```bash
+yay -S f3-qt
+```
+
+* Other distributions:
+  Check your distribution's package manager for availability
+
+Notes
+-----
+
+* The F3 command-line utility must be installed for F3-Qt to function properly
+* The installed program can be launched from the application menu or terminal
+* No additional environment configuration is required
             
