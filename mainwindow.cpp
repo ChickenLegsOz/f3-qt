@@ -106,7 +106,7 @@ void MainWindow::clearStatus()
     ui->labelSpace->clear();
     ui->labelSpeed->clear();
     progressBar->setValue(0);
-    showResultPage(false);
+    ui->tabWidget->setTabVisible(3, false);  // Hide results tab without changing current tab
 }
 
 void MainWindow::showProgress(int progress10K)
@@ -184,11 +184,14 @@ void MainWindow::showResultPage(bool visible)
         ui->tabWidget->setCurrentIndex(3);
     } else {
         ui->tabWidget->setTabVisible(3, false);
-        ui->tabWidget->setCurrentIndex(0);
+        // Keep the current tab unless it's the results tab (index 3)
+        if (ui->tabWidget->currentIndex() == 3) {
+            ui->tabWidget->setCurrentIndex(ui->tabWidget->currentIndex() == 1 ? 1 : 0);
+        }
     }
 }
 
-QString MainWindow::mountDisk(const QString& device)
+QString MainWindow::mountDisk(const QString& device, bool useSudo)
 {
     // Sanitize and validate the device path
     QString sanitizedDevice = device.trimmed();
@@ -219,29 +222,47 @@ QString MainWindow::mountDisk(const QString& device)
         return QString();
     }
     
-    // Setup and execute mount command with smart pointer
-    auto proc = std::unique_ptr<QProcess>(new QProcess());
-    QStringList args;
-    args << sanitizedDevice << mountDir;
+    // Setup and execute mount command
+    QProcess proc;
+    QString command;
     
-    proc->start("mount", args);
-    if (!proc->waitForStarted(5000)) {  // 5 second timeout
+    if (useSudo) {
+        PasswordDialog dialog(this);
+        if (dialog.exec() != QDialog::Accepted) {
+            dir.rmdir(mountDir);
+            return QString();
+        }
+        QString password = dialog.getPassword();
+        command = QString("echo \"%1\" | sudo -S mount %2 %3")
+                     .arg(password, sanitizedDevice, mountDir);
+        proc.start("bash", QStringList() << "-c" << command);
+    } else {
+        proc.start("mount", QStringList() << sanitizedDevice << mountDir);
+    }
+    
+    if (!proc.waitForStarted(5000)) {  // 5 second timeout
         dir.rmdir(mountDir);
         QMessageBox::critical(this, "Mount Error", "Failed to start mount command.");
         return QString();
     }
     
-    if (!proc->waitForFinished(30000)) {  // 30 second timeout
-        proc->terminate();
-        proc->waitForFinished(5000);
+    if (!proc.waitForFinished(30000)) {  // 30 second timeout
+        proc.terminate();
+        proc.waitForFinished(5000);
         dir.rmdir(mountDir);
         QMessageBox::critical(this, "Mount Error", "Mount operation timed out.");
         return QString();
     }
     
-    if (proc->exitCode() != 0) {
-        QString errorOutput = QString::fromUtf8(proc->readAllStandardError());
+    if (proc.exitCode() != 0) {
+        QString errorOutput = QString::fromUtf8(proc.readAllStandardError());
         dir.rmdir(mountDir);
+        
+        if (!useSudo && errorOutput.contains("Permission denied")) {
+            // Retry with sudo
+            return mountDisk(device, true);
+        }
+        
         QMessageBox::critical(this, "Mount Error", 
             QString("Failed to mount device.\nError: %1").arg(errorOutput.isEmpty() ? "Unknown error" : errorOutput));
         return QString();
@@ -257,7 +278,7 @@ QString MainWindow::mountDisk(const QString& device)
     return mountDir;
 }
 
-bool MainWindow::unmountDisk(const QString& mountPoint)
+bool MainWindow::unmountDisk(const QString& mountPoint, bool useSudo)
 {
     // Validate mount point
     QString sanitizedMountPoint = mountPoint.trimmed();
@@ -272,26 +293,43 @@ bool MainWindow::unmountDisk(const QString& mountPoint)
         return false;
     }
     
-    // Setup and execute unmount command with smart pointer
-    auto proc = std::unique_ptr<QProcess>(new QProcess());
-    QStringList args;
-    args << sanitizedMountPoint;
+    // Setup and execute unmount command
+    QProcess proc;
+    QString command;
     
-    proc->start("umount", args);
-    if (!proc->waitForStarted(5000)) {  // 5 second timeout
+    if (useSudo) {
+        PasswordDialog dialog(this);
+        if (dialog.exec() != QDialog::Accepted) {
+            return false;
+        }
+        QString password = dialog.getPassword();
+        command = QString("echo \"%1\" | sudo -S umount %2")
+                     .arg(password, sanitizedMountPoint);
+        proc.start("bash", QStringList() << "-c" << command);
+    } else {
+        proc.start("umount", QStringList() << sanitizedMountPoint);
+    }
+    
+    if (!proc.waitForStarted(5000)) {  // 5 second timeout
         QMessageBox::critical(this, "Unmount Error", "Failed to start unmount command.");
         return false;
     }
     
-    if (!proc->waitForFinished(30000)) {  // 30 second timeout
-        proc->terminate();
-        proc->waitForFinished(5000);
+    if (!proc.waitForFinished(30000)) {  // 30 second timeout
+        proc.terminate();
+        proc.waitForFinished(5000);
         QMessageBox::critical(this, "Unmount Error", "Unmount operation timed out.");
         return false;
     }
     
-    if (proc->exitCode() != 0) {
-        QString errorOutput = QString::fromUtf8(proc->readAllStandardError());
+    if (proc.exitCode() != 0) {
+        QString errorOutput = QString::fromUtf8(proc.readAllStandardError());
+        
+        if (!useSudo && errorOutput.contains("Permission denied")) {
+            // Retry with sudo
+            return unmountDisk(mountPoint, true);
+        }
+        
         QMessageBox::critical(this, "Unmount Error", 
             QString("Failed to unmount device.\nError: %1").arg(errorOutput.isEmpty() ? "Unknown error" : errorOutput));
         return false;
@@ -459,10 +497,37 @@ void MainWindow::on_cuiError(F3Error errCode)
                               "Please try mounting it correctly.");
             break;
         case F3Error::NoPermission:
-            QMessageBox::warning(this,"Permission denied",
-                          "Cannot write to device.\n"
-                          "Try to re-run with sudo.");
-            showStatus("No enough space for test.");
+            {
+                if (QMessageBox::question(this, "Permission denied",
+                    "Cannot write to device.\nWould you like to retry with elevated privileges?",
+                    QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) 
+                {
+                    PasswordDialog dialog(this);
+                    if (dialog.exec() == QDialog::Accepted) {
+                        QString password = dialog.getPassword();
+                        QString command;
+                        if (ui->tabWidget->currentIndex() == 0) {
+                            // Basic mode
+                            command = QString("echo \"%1\" | sudo -S chmod a+rw %2")
+                                        .arg(password, ui->textDevPath->text());
+                        } else {
+                            // Advanced mode
+                            command = QString("echo \"%1\" | sudo -S chmod a+rw %2")
+                                        .arg(password, ui->textDev->text());
+                        }
+                        QProcess proc;
+                        proc.start("bash", QStringList() << "-c" << command);
+                        proc.waitForFinished();
+                        
+                        if (proc.exitCode() == 0) {
+                            // Retry the operation
+                            on_buttonCheck_clicked();
+                            return;
+                        }
+                    }
+                }
+                showStatus("Permission denied. Test cancelled.");
+            }
             break;
         case F3Error::NoSpace:
             QMessageBox::information(this,"No space",
@@ -566,8 +631,29 @@ bool MainWindow::validatePath(const QString& path, bool isDevice) {
         // Check if it's a block device by checking if it's a special file
         QFile device(path);
         if (!device.open(QIODevice::ReadOnly)) {
+            // If we can't open the device, try with sudo
+            if (QMessageBox::question(this, "Permission denied",
+                "Cannot access the device. Would you like to try with elevated privileges?",
+                QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) 
+            {
+                PasswordDialog dialog(this);
+                if (dialog.exec() == QDialog::Accepted) {
+                    QString password = dialog.getPassword();
+                    QString command = QString("echo \"%1\" | sudo -S chmod a+rw %2")
+                                    .arg(password, path);
+                    QProcess proc;
+                    proc.start("bash", QStringList() << "-c" << command);
+                    proc.waitForFinished();
+                    
+                    // Try opening the device again
+                    if (device.open(QIODevice::ReadOnly)) {
+                        device.close();
+                        return true;
+                    }
+                }
+            }
             QMessageBox::warning(this, "Validation Error", 
-                "Cannot access the device. Check permissions.");
+                "Cannot access the device. Permission denied.");
             return false;
         }
         device.close();
@@ -616,15 +702,49 @@ void MainWindow::on_buttonCheck_clicked()
     else
     {
         if (ui->optionQuickTest->isChecked())
+        {
             cui.setOption("mode", "quick");
+            // For quick test mode, ensure we have write access to the device
+            QFile device(inputPath);
+            if (!device.open(QIODevice::ReadWrite)) {
+                if (QMessageBox::question(this, "Permission denied",
+                    "Cannot access the device. Would you like to try with elevated privileges?",
+                    QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) 
+                {
+                    PasswordDialog dialog(this);
+                    if (dialog.exec() == QDialog::Accepted) {
+                        QString password = dialog.getPassword();
+                        QString command = QString("echo \"%1\" | sudo -S chmod a+rw %2")
+                                        .arg(password, inputPath);
+                        QProcess proc;
+                        proc.start("bash", QStringList() << "-c" << command);
+                        proc.waitForFinished();
+                        
+                        if (!device.open(QIODevice::ReadWrite)) {
+                            QMessageBox::critical(this, "Error", 
+                                "Cannot access device even with elevated privileges.");
+                            return;
+                        }
+                    } else {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+            device.close();
+        }
         else
         {
             mountPoint = mountDisk(inputPath);
             if (mountPoint.isEmpty())
             {
-                QMessageBox::critical(this,"Error","Cannot mount selected device!\n"
-                                      "You may need to run this program as root.");
-                return;
+                // Try with sudo if normal mount fails
+                mountPoint = mountDisk(inputPath, true);
+                if (mountPoint.isEmpty()) {
+                    QMessageBox::critical(this, "Error", "Cannot mount selected device!");
+                    return;
+                }
             }
             inputPath = mountPoint;
             cui.setOption("mode", "legacy");

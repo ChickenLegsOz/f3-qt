@@ -54,8 +54,8 @@ private:
     void showProgress(int progress10K);
     void showCapacity(int value);
     void showResultPage(bool visible);
-    QString mountDisk(const QString& device);
-    bool unmountDisk(const QString& mountPoint);
+    QString mountDisk(const QString& device, bool useSudo = false);
+    bool unmountDisk(const QString& mountPoint, bool useSudo = false);
     bool sureToExit(bool manualClose);
     void promptFix();
     bool validatePath(const QString& path, bool isDevice);
