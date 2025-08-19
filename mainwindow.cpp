@@ -412,14 +412,6 @@ void MainWindow::on_cuiStatusChanged(F3Status status)
         }
         case F3Status::Progressed:
             showProgress(cui.progress10K);
-            switch(progressBar->format()[0].toLatin1()){
-                case '|': qsSpinNext = "/"; break;
-                case '/': qsSpinNext = "---"; break;
-                case '-': qsSpinNext = "\\"; break;
-                case '\\': qsSpinNext = "|"; break;
-                default: qsSpinNext = "|"; break;
-            }
-            progressBar->setFormat(qsSpinNext);
             break;
     }
     if (status == F3Status::Running ||
