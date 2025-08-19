@@ -31,6 +31,7 @@ if (${QT_VERSION_MAJOR} EQUAL 6)
 endif()
 
 add_executable(f3-qt WIN32 MACOSX_BUNDLE
+    aboutdialog.cpp aboutdialog.h aboutdialog.ui
     f3_launcher.cpp f3_launcher.h
     helpwindow.cpp helpwindow.h helpwindow.ui
     main.cpp
@@ -43,19 +44,14 @@ target_compile_definitions(f3-qt PRIVATE
 )
 
 # Icon resources
-set(ICON_RESOURCES
-    f3.png
-)
-
 if (${QT_VERSION_MAJOR} EQUAL 6)
     qt_add_resources(f3-qt "icons"
         PREFIX
-            "/icons"
+            "/icon"
         FILES
-            ${ICON_RESOURCES}
+            f3.png
     )
 else()
-    # Qt5 way of adding resources
     qt5_add_resources(ICON_RC "icon.qrc")
     target_sources(f3-qt PRIVATE ${ICON_RC})
 endif()
