@@ -17,6 +17,9 @@
 #include <QStyle>
 #include <QProcess>
 #include <QTextStream>
+#include <QSettings>
+#include <QWindow>
+#include <QTimer>
 
 void f3_qt_fillReport(f3_launcher_report &report)
 {
@@ -42,6 +45,10 @@ MainWindow::MainWindow(QWidget *parent) :
     F3Error cuiError = cui.getErrCode();
     if (cuiError != F3Error::Ok)
         on_cuiError(cuiError);
+
+    // Set minimum size but allow resizing
+    setMinimumSize(400, 350);
+    restoreWindowState();
 
     ui->setupUi(this);
     auto statusBar = new QStatusBar(this);
@@ -78,15 +85,90 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(&timer, &QTimer::timeout, this, &MainWindow::on_timerTimeout);
     checking = false;
     
-    // Center window on screen
-    QScreen *screen = QGuiApplication::primaryScreen();
-    if (screen) {
-        QRect screenGeometry = screen->availableGeometry();
-        move((screenGeometry.width() - width()) / 2 + screenGeometry.left(),
-             (screenGeometry.height() - height()) / 2 + screenGeometry.top());
-    }
     // Set minimum size but allow resizing
     setMinimumSize(400, 350);
+    
+    // Try to restore saved position and size
+    QSettings settings("ChickenLegsOz", "F3-Qt");
+    
+    qDebug() << "Settings file:" << settings.fileName();
+    qDebug() << "Contains pos:" << settings.contains("pos");
+    qDebug() << "Contains size:" << settings.contains("size");
+    qDebug() << "All keys:" << settings.allKeys();
+    
+    // Debug available screens
+    qDebug() << "Available screens:";
+    for (const QScreen* screen : QGuiApplication::screens()) {
+        qDebug() << "  Screen:" << screen->name()
+                << "Geometry:" << screen->geometry()
+                << "Available:" << screen->availableGeometry();
+    }
+    
+    if (settings.contains("pos") && settings.contains("size")) {
+        QPoint pos = settings.value("pos").toPoint();
+        QSize size = settings.value("size").toSize();
+        
+        qDebug() << "Restored pos:" << pos;
+        qDebug() << "Restored size:" << size;
+        
+        // Calculate visible screen area across all screens
+        QRegion visibleArea;
+        for (const QScreen* screen : QGuiApplication::screens()) {
+            visibleArea += screen->availableGeometry();
+            qDebug() << "Added screen area:" << screen->availableGeometry();
+        }
+        
+        // Check if the window would be visible
+        QRect windowRect(pos, size);
+        bool isVisible = visibleArea.intersects(windowRect);
+        qDebug() << "Window rect:" << windowRect;
+        qDebug() << "Is window visible:" << isVisible;
+        
+        if (isVisible) {
+            // First set the size
+            resize(size);
+            
+            // Move to the saved position
+            move(pos);
+            
+            // Check visibility after a short delay to ensure window manager has processed the move
+            QTimer::singleShot(0, this, [this, pos, size]() {
+                bool windowVisible = false;
+                // Check if the window is visible on any screen
+                for (const QScreen* screen : QGuiApplication::screens()) {
+                    if (screen->geometry().intersects(QRect(pos, size))) {
+                        windowVisible = true;
+                        break;
+                    }
+                }
+                
+                if (!windowVisible) {
+                    qDebug() << "Window not visible after restore, moving to:" << pos;
+                    move(pos);
+                }
+                qDebug() << "Final window geometry:" << geometry();
+                qDebug() << "Final global position:" << mapToGlobal(QPoint(0,0));
+            });
+        } else {
+            // Center on screen if saved position is invalid
+            QScreen *screen = QGuiApplication::primaryScreen();
+            if (screen) {
+                QRect screenGeometry = screen->availableGeometry();
+                resize(size);
+                move((screenGeometry.width() - width()) / 2 + screenGeometry.left(),
+                     (screenGeometry.height() - height()) / 2 + screenGeometry.top());
+            }
+        }
+    } else {
+        // First run - center on screen
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen) {
+            QRect screenGeometry = screen->availableGeometry();
+            move((screenGeometry.width() - width()) / 2 + screenGeometry.left(),
+                 (screenGeometry.height() - height()) / 2 + screenGeometry.top());
+        }
+    }
+    
     clearStatus();
 }
 
@@ -779,17 +861,60 @@ void MainWindow::on_buttonCheck_clicked()
     cui.startCheck(inputPath);
 }
 
+void MainWindow::saveWindowState()
+{
+    QSettings settings("ChickenLegsOz", "F3-Qt");
+    settings.setValue("geometry", saveGeometry());
+    settings.setValue("windowState", saveState());
+    settings.sync();
+    qDebug() << "Window state saved to:" << settings.fileName();
+}
+
+void MainWindow::restoreWindowState()
+{
+    QSettings settings("ChickenLegsOz", "F3-Qt");
+    
+    // Try to restore saved state
+    if (settings.contains("geometry")) {
+        restoreGeometry(settings.value("geometry").toByteArray());
+        restoreState(settings.value("windowState").toByteArray());
+        qDebug() << "Window state restored from:" << settings.fileName();
+    } else {
+        centerOnScreen();
+    }
+}
+
+void MainWindow::centerOnScreen()
+{
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    if (screen) {
+        const QRect screenGeometry = screen->availableGeometry();
+        move(screenGeometry.center() - rect().center());
+        qDebug() << "Window centered on screen:" << screenGeometry;
+    }
+}
+
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    if (!checking)
+    saveWindowState();
+
+    if (!checking) {
+        event->accept();
         return;
-    if (sureToExit(false))
-    {
+    }
+
+    if (!checking) {
+        event->accept();
+        return;
+    }
+    
+    if (sureToExit(false)) {
         cui.stopCheck();
         help.close();
-    }
-    else
+        event->accept();
+    } else {
         event->ignore();
+    }
 }
 
 void MainWindow::on_buttonExit_clicked()

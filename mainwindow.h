@@ -5,6 +5,8 @@
 #include <QTimer>
 #include <QLabel>
 #include <QProgressBar>
+#include <QScreen>
+#include <QSettings>
 #include <memory>
 #include "f3_launcher.h"
 #include "helpwindow.h"
@@ -48,6 +50,10 @@ private:
     QString mountPoint;
     std::unique_ptr<QLabel> currentStatus;
     std::unique_ptr<QProgressBar> progressBar;
+    
+    void saveWindowState();
+    void restoreWindowState();
+    void centerOnScreen();
 
     void showStatus(const QString& string);
     void clearStatus();
